@@ -46,17 +46,30 @@ public class Match {
     }
 
     /**
-     * @return Returns true if this Match is a row( numOrbs >= 6, and all y positions are equal ).
+     * Returns if this match is a row or not based on how many columns are given.
+     * A match can only be a row if it spans left to right in a single line somewhere in the match.
+     *
+     * @param boardColumns The number of columns the Board has to check for this match.
+     * @return Returns true if this Match is a row( numOrbs >= Board columns, and at least Board columns orb y positions are equal ).
      */
-    public boolean isRow() {
-        // TODO Check for Heroes type rows.
+    public boolean isRow(int boardColumns) {
         boolean isRow = false;
-        if (orbPositions.size() >= 6)
-            for (int i = 0; i < orbPositions.size() - 1; i++)
-                if (orbPositions.get(i).y == orbPositions.get(i + 1).y)
-                    isRow = true;
-                else
-                    return false;
+        if (orbPositions.size() >= boardColumns) {
+            int maxY = 0;
+            for (int i = 0; i < orbPositions.size(); i++) {
+                int y = orbPositions.get(i).y;
+                if (y > maxY)
+                    maxY = y;
+            }
+
+            int[] counts = new int[maxY + 1];
+            for (int i = 0; i < orbPositions.size(); i++) {
+                int y = orbPositions.get(i).y;
+                counts[y]++;
+                if (counts[y] >= boardColumns)
+                    return true;
+            }
+        }
         return isRow;
     }
 
@@ -124,7 +137,7 @@ public class Match {
 
             return getOrbType() == otherMatch.getOrbType()
                     && getNumOrbs() == otherMatch.getNumOrbs()
-                    && isRow() == otherMatch.isRow()
+                    && isRow(6) == otherMatch.isRow(6)
                     && isCross() == otherMatch.isCross()
                     && isExplodedOrbs() == otherMatch.isExplodedOrbs();
         }

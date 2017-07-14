@@ -134,6 +134,16 @@ public class Board {
     }
 
     /**
+     * Checks if the board can currently move in the direction given.
+     *
+     * @param direction Direction to check.
+     * @return true if can move, false otherwise.
+     */
+    public boolean canMove(Direction direction) {
+        return new Board(this).move(direction);
+    }
+
+    /**
      * Moves the current position orb in the given direction.
      *
      * @param direction Direction to move.

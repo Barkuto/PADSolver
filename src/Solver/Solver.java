@@ -7,18 +7,32 @@ import Board.Orb;
 
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Iggie on 6/22/2017.
  */
 public class Solver {
     private boolean solving = false;
+    private int numDirs = 4;
 
     /**
      * Stops any current solving that might be occurring.
      */
     public void stopSolving() {
         solving = false;
+    }
+
+    /**
+     * Sets the allowed amount of directions, either 4(straight) or 8(diagonals)
+     *
+     * @param dirs Number of Directions to go in.
+     */
+    public void setNumDirs(int dirs) {
+        if (!solving)
+            numDirs = dirs == 4 || dirs == 8 ? dirs : numDirs;
     }
 
     /**
@@ -53,12 +67,12 @@ public class Solver {
 
         int rows = initialBoard.getRows();
         int cols = initialBoard.getColumns();
-        int solutionsToKeep = rows * cols * pathScale;
+        int solutionsToKeep = cols * pathScale;
 
         ArrayList<Thread> threads = new ArrayList<>();
 
         for (int y = 0; y < rows; y++) {
-            ArrayList<SolutionEntry> startingBoards = new ArrayList<>();
+            ArrayList<SolutionEntry> startingBoards = new ArrayList<>(solutionsToKeep);
             for (int x = 0; x < cols; x++) {
                 if (!solving)
                     return null;
@@ -68,11 +82,12 @@ public class Solver {
             }
             int moves = maxMoves;
             Thread t = new Thread(() -> {
-                ArrayList<SolutionEntry> solutionsFound = solve_sub(startingBoards, heuristic, moves, solutionsToKeep / rows);
-                if (solutionsFound != null)
+                ArrayList<SolutionEntry> solutionsFound = solve_sub(startingBoards, heuristic, moves, solutionsToKeep);
+                if (solutionsFound != null) {
                     synchronized (syncSolutions) {
                         syncSolutions.addAll(solutionsFound);
                     }
+                }
             });
             if (!solving)
                 return null;
@@ -84,10 +99,10 @@ public class Solver {
                 threads.get(i).join();
             } catch (InterruptedException ignored) {
             }
-
         if (!solving)
             return null;
         ArrayList<SolutionEntry> solutions = simplifySolutions(new ArrayList<>(syncSolutions));
+//        ArrayList<SolutionEntry> solutions = new ArrayList<>(syncSolutions);
         solutions.sort((o1, o2) -> Double.compare(o2.getScore(), o1.getScore()));
         solving = false;
         return solutions;
@@ -129,13 +144,13 @@ public class Solver {
 
         int rows = initialBoard.getRows();
         int cols = initialBoard.getColumns();
-        int solutionsToKeep = rows * cols * pathScale;
+        int solutionsToKeep = cols * pathScale;
 
         ArrayList<Thread> threads = new ArrayList<>();
 
         Board board = new Board(initialBoard);
         board.setStart(startX, startY);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < numDirs; i++) {
             if (!solving)
                 return null;
             Board b = new Board(board);
@@ -147,7 +162,7 @@ public class Solver {
 
                 int moves = maxMoves;
                 Thread t = new Thread(() -> {
-                    ArrayList<SolutionEntry> solutionsFound = solve_sub(startingBoard, heuristic, moves, solutionsToKeep / 4);
+                    ArrayList<SolutionEntry> solutionsFound = solve_sub(startingBoard, heuristic, moves, solutionsToKeep);
                     if (solutionsFound != null)
                         synchronized (syncSolutions) {
                             syncSolutions.addAll(solutionsFound);
@@ -182,58 +197,45 @@ public class Solver {
      * @param solutionsToKeep Num solutions to keep = rows * columns * scale.
      * @return List of solutions from the given start board.
      */
-    private ArrayList<SolutionEntry> solve_sub(ArrayList<SolutionEntry> startingBoards, Heuristic heuristic, int maxMoves, int solutionsToKeep) {
-        ArrayList<SolutionEntry> solutions = startingBoards;
+    public ArrayList<SolutionEntry> solve_sub(ArrayList<SolutionEntry> startingBoards, Heuristic heuristic, int maxMoves, int solutionsToKeep) {
+        ArrayList<SolutionEntry> solutions = new ArrayList<>(startingBoards);
 
-        while (true) {
+        ArrayList<SolutionEntry> oldSolutions = new ArrayList<>();
+        while (!solutions.equals(oldSolutions)) {
+            oldSolutions = new ArrayList<>(solutions);
             ArrayList<SolutionEntry> solutionsToAdd = new ArrayList<>();
-            int maxMovesMade = 0;
             for (int i = 0; i < solutions.size(); i++) {
-                Board b = solutions.get(i).getBoard();
-                if (b.getMoves().size() > maxMovesMade)
-                    maxMovesMade = b.getMoves().size();
+                Board b = new Board(solutions.get(i).getBoard());
                 if (b.getMoves().size() < maxMoves) {
-                    for (int j = 0; j < 4; j++) {
+                    Direction lastDir = b.getMoves().size() > 0 ? b.getMoves().get(b.getMoves().size() - 1) : null;
+                    for (int j = 0; j < numDirs; j++) {
                         if (!solving)
                             return null;
-                        Board board = new Board(b);
-                        ArrayList<Direction> moves = board.getMoves();
-                        Direction lastDir = null;
-                        if (moves.size() > 0)
-                            lastDir = moves.get(moves.size() - 1);
-                        if (lastDir == null || !lastDir.isOppositeTo(Direction.values()[j])) {
-                            if (board.move(Direction.values()[j])) {
-                                SolutionEntry e = new SolutionEntry(board, computeScore(board, heuristic));
-                                if (!solutions.contains(e))
-                                    solutionsToAdd.add(e);
-                            }
+                        Direction dirToMove = Direction.values()[j];
+                        if (b.canMove(dirToMove) && (lastDir == null || !lastDir.isOppositeTo(dirToMove))) {
+                            Board board = new Board(b);
+                            board.move(dirToMove);
+                            SolutionEntry e = new SolutionEntry(board, computeScore(board, heuristic));
+                            if (!solutionsToAdd.contains(e) && !solutions.contains(e))
+                                solutionsToAdd.add(e);
                         }
                     }
                 }
                 if (!solving)
                     return null;
             }
-            solutions.addAll(solutionsToAdd);
 
-            solutions.sort((o1, o2) -> Double.compare(o2.getScore(), o1.getScore()));
-
-            if (solutions.size() > solutionsToKeep)
-                solutions = new ArrayList<>(solutions.subList(0, solutionsToKeep));
-
-            boolean greaterMovesFound = false;
-            for (SolutionEntry e : solutions) {
-                if (!solving)
-                    return null;
-                Board b = e.getBoard();
-                if (b.getMoves().size() > maxMovesMade) {
-                    greaterMovesFound = true;
-                    break;
-                }
-            }
             if (!solving)
                 return null;
-            if (!greaterMovesFound)
-                break;
+
+            solutions.addAll(solutionsToAdd);
+            if (solutions.size() > solutionsToKeep) {
+                solutions.sort((o1, o2) -> Double.compare(o2.getScore(), o1.getScore()));
+                solutions = new ArrayList<>(solutions.subList(0, solutionsToKeep));
+            }
+
+            if (!solving)
+                return null;
         }
         return solutions;
     }
@@ -339,12 +341,21 @@ public class Solver {
         switch (comboType) {
             case COMBO:
                 comboWeight = 4.0;
-                matchesMadeScore -= board.maxPossibleCombos() - matchesMade;
+                if (matchesMade + 2 == board.maxPossibleCombos()) {
+                    matchesMadeScore += 1.25 * matchesMade;
+                } else if (matchesMade + 1 == board.maxPossibleCombos()) {
+                    matchesMadeScore += 1.5 * matchesMade;
+                } else if (matchesMade == board.maxPossibleCombos()) {
+                    matchesMadeScore += 2.0 * matchesMade;
+                } else {
+                    matchesMadeScore -= matchesMade / 2.0;
+                }
+//                matchesMadeScore -= board.maxPossibleCombos() - matchesMade;
                 break;
             case TPA:
                 break;
             case ROW:
-                comboWeight = 0.25;
+                comboWeight = 0.1;
                 typeWeight = 4.0;
                 break;
             case SPARKLE:
@@ -363,8 +374,9 @@ public class Solver {
                     matchesMadeScore += 2;
                 switch (comboType) {
                     case COMBO:
+                        matchesMadeScore += m.getNumOrbs();
                         if (m.getNumOrbs() > 3)
-                            matchesMadeScore -= 2 * (m.getNumOrbs() - 3);
+                            matchesMadeScore -= m.getNumOrbs();
                         break;
                     case TPA:
                         if (m.getNumOrbs() == 4) {
@@ -376,13 +388,13 @@ public class Solver {
                         break;
                     case ROW:
                         if (m.getOrbType() == primaryOrb) {
-                            if (m.isRow()) {
+                            if (m.isRow(board.getColumns())) {
                                 typeScore += m.getNumOrbs();
                                 rows++;
                                 if (m.getNumOrbs() < heuristic.getMinRowOrbs())
                                     typeScore -= 2;
                             } else if (m.getNumOrbs() > orbCount.get(primaryOrb) % 6) {
-                                typeScore -= 4.0;
+                                typeScore -= 4;
                             }
                         }
                         break;

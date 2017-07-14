@@ -10,6 +10,8 @@ public class Heuristic {
     private ComboType comboType;
     private int minConnectedOrbs, minRowOrbs;
 
+    public static Heuristic DEFAULT = new Heuristic(Orb.BLANK, ComboType.COMBO);
+
     /**
      * Creates a Heuristic based on the given params.
      *

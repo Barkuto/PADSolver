@@ -53,7 +53,7 @@ public class BoardPanel extends JPanel {
 
         this.board = new Board(columns, rows);
         board.randomize();
-//        board.withLayout("DLLBGBRBDGDBLGLRRRRRDGGGLLBDDB");
+//        board.withLayout("BDHHHRBDHDRBDHBRDHBBDRDHRHHRDD");
         initialBoard = new Board(board);
         Dimension preferredSize = new Dimension(tileWidth * board.getColumns(), tileHeight * board.getRows());
         setPreferredSize(preferredSize);
@@ -241,6 +241,7 @@ public class BoardPanel extends JPanel {
 
             solutionsPanel.unSelect();
             solutionsPanel.clearSolutions();
+            showMoves = false;
 
             new Thread(() -> {
                 int periods = 0;
@@ -265,6 +266,7 @@ public class BoardPanel extends JPanel {
                 long start = System.currentTimeMillis();
 
                 ArrayList<Solver.SolutionEntry> solutions = solver.solve(initialBoard, heuristicPanel.getHeuristic(), heuristicPanel.getMaxMoves(), heuristicPanel.getScale());
+//                ArrayList<Solver.SolutionEntry> solutions = solver.solveWithStart(initialBoard, heuristicPanel.getHeuristic(), heuristicPanel.getMaxMoves(), heuristicPanel.getScale(), 1, 3);
                 solving = false;
                 if (solutions != null) {
                     heuristicPanel.setStatus("Done in " + (System.currentTimeMillis() - start) / 1000 + "s");
@@ -347,7 +349,7 @@ public class BoardPanel extends JPanel {
 
             int i = 0;
             for (Direction d : moves) {
-                int arrowPositions = 8;
+                int arrowPositions = 5;
                 if (xOffset >= tileWidth / 2 - (tileWidth / arrowPositions))
                     xDir = -1;
                 else if (xOffset <= -tileWidth / 2 + (tileWidth / arrowPositions))

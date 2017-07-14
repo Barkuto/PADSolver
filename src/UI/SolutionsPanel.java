@@ -120,7 +120,7 @@ public class SolutionsPanel extends JPanel {
 
             DrawUtils.drawCenteredString(g, "#" + index, new Rectangle(xpos, ypos, 0, 0), font);
             xpos = getWidth() * 2 / 8;
-            DrawUtils.drawCenteredString(g, "W: " + score, new Rectangle(xpos, ypos, 0, 0), font);
+            DrawUtils.drawCenteredString(g, String.format("W: %.3f", score), new Rectangle(xpos, ypos, 0, 0), font);
             xpos = getWidth() * 3 / 6;
             DrawUtils.drawCenteredString(g, "Combos: " + matches.size(), new Rectangle(xpos, ypos, 0, 0), font);
             xpos = getWidth() * 5 / 6;
